@@ -1,0 +1,49 @@
+---
+title: "Getting Started with {tidysdm}"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting Started with {tidysdm}}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(tidysdm)
+```
+
+`tidysdm` is an offshoot of the `ENMTools` package, and will eventually take over that package's modelling functions. `tidysdm` is a package to make it easy to fit Species Distribution Models in a `tidymodels` framework.
+We will use data from the `ENMTools` package to demonstrate how `tidysdm` works. `tidysdm` is
+
+```{r load_data}
+library(ENMTools)
+library(spatialsample)
+data("iberolacerta.clade")
+monticola <- iberolacerta.clade$species$monticola
+
+```
+
+We start by generating a {tidymodels} compatable `sf` object for the species we want to
+
+```{r bg_convert}
+dat <- sdm_data(monticola$presence.points,
+                bg = monticola$range,
+                coords = c("Longitude",
+                           "Latitude"),
+                crs = 4326)
+
+dat
+
+```
+
+```{r spatial_block_cv}
+cv_folds <- spatial_block_cv(dat)
+cv_folds
+autoplot(cv_folds)
+```
