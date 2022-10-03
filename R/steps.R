@@ -45,20 +45,9 @@ prep.step_sample_pseudo_absences <- function(x, training, info = NULL, ...) {
   if(length(col_names) == 0) {
     col_names <- attr(training, "sf_column")
   }
-  if(!inherits(training[, col_names]))
-  ## We'll use the names later so make sure they are available
-  if (x$options$names == FALSE) {
-    rlang::abort("`names` should be set to TRUE")
+  if(any(purrr::map_lgl(training[, col_names], ~!inherits(.x, "sfc")))) {
+   rlang::abort("step_sample_pseudo_absences only works with sfc geoemtry columns.")
   }
-
-  if (!any(names(x$options) == "probs")) {
-    x$options$probs <- (0:100)/100
-  } else {
-    x$options$probs <- sort(unique(x$options$probs))
-  }
-
-  # Compute percentile grid
-  ref_dist <- purrr::map(training[, col_names],  get_train_pctl, args = x$options)
 
   ## Use the constructor function to return the updated object.
   ## Note that `trained` is now set to TRUE

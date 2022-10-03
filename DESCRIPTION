@@ -1,12 +1,17 @@
 Package: tidysdm
-Title: What the Package Does (One Line, Title Case)
+Title: Sprecies Distribution Modelling with Tidymodels
 Version: 0.0.0.9000
 Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"),
-           comment = c(ORCID = "YOUR-ORCID-ID"))
-Description: What the package does (one paragraph).
-License: `use_mit_license()`, `use_gpl3_license()` or friends to pick a
-    license
+    person("Russell", "Dinnage", , "rdinnage@fiu.edu", role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0003-0846-2819"))
+Description: Provides functions and classes to help create Species Distribution 
+  Models (SDMs) within the {tidymodels} framework. Provides new {parsnip} models,
+  new {recipes} steps, and {yardstick} metrics. This package provides access to the 
+  powerful {tidymodels} ecosystem for SDMs, especially the package {spatialsample} 
+  for spatially aware cross validation and model evaluation, as well as opening 
+  up all classification models implemented in {parsnip} for presence-only SDMs,
+  using the pseudo-absence approach.
+License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.2.1
@@ -16,7 +21,9 @@ Depends:
 Imports: 
     dplyr,
     fasterize,
+    purrr,
     rlang (>= 0.4.11),
+    sf,
     stars
 Suggests: 
     knitr,
