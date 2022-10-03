@@ -42,7 +42,10 @@ step_sample_pseudo_absences_new <-
 prep.step_sample_pseudo_absences <- function(x, training, info = NULL, ...) {
   col_names <- recipes_eval_select(x$terms, training, info)
   ## You can add error trapping for non-numeric data here and so on.
-
+  if(length(col_names) == 0) {
+    col_names <- attr(training, "sf_column")
+  }
+  if(!inherits(training[, col_names]))
   ## We'll use the names later so make sure they are available
   if (x$options$names == FALSE) {
     rlang::abort("`names` should be set to TRUE")
