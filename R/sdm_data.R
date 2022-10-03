@@ -34,7 +34,8 @@ sdm_data <- function(presence_pnts, bg, n = 500, ...) {
   bg_grid <- sf::st_make_grid(bg, n = n,
                               square = FALSE) %>%
     sf::st_sf() %>%
-    sf::st_intersection(bg) %>%
+    sf::st_join(bg %>% mutate(pres = 1)) %>%
+    filter(!is.na(pres)) %>%
     dplyr::mutate(id = seq_len(dplyr::n())) %>%
     dplyr::select(id) %>%
     sf::st_make_valid()

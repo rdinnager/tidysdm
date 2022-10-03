@@ -23,6 +23,7 @@ We will use data from the `ENMTools` package to demonstrate how `tidysdm` works.
 
 ```{r load_data}
 library(ENMTools)
+library(tidymodels)
 library(spatialsample)
 data("iberolacerta.clade")
 monticola <- iberolacerta.clade$species$monticola
@@ -46,4 +47,15 @@ dat
 cv_folds <- spatial_block_cv(dat)
 cv_folds
 autoplot(cv_folds)
+```
+Let's create a recipe to apply some common data processing steps to prepare for SDM fitting.
+
+```{r steps}
+sdm_recipe <- recipe(dat) %>%
+  step_sample_pseudo_absences(size = 1000)
+
+test <- prep(sdm_recipe)
+
+test2 <- bake(test, dat)
+
 ```
