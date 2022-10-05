@@ -18,7 +18,8 @@ a raster mask (in \code{stars} or \code{raster} format)}
 
 \item{n}{Number of grid cells to divide the background
 area into. These grid cells will be used for spatial
-resampling (e.g. with \code{spatialsample} package)}
+resampling (e.g. with \code{spatialsample} package) or
+thinning (using \code{step_thin()})}
 
 \item{...}{}
 }

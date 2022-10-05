@@ -26,6 +26,7 @@ library(ENMTools)
 library(tidymodels)
 library(spatialsample)
 data("iberolacerta.clade")
+data("euro.worldclim")
 monticola <- iberolacerta.clade$species$monticola
 
 ```
@@ -44,15 +45,20 @@ dat
 ```
 
 ```{r spatial_block_cv}
-cv_folds <- spatial_block_cv(dat)
+cv_folds <- spatial_block_cv(dat, method = "snake",
+                             n = c(6, 4),
+                             buffer = 0.5)
 cv_folds
 autoplot(cv_folds)
+
+autoplot(cv_folds$splits[[1]])
+autoplot(cv_folds$splits[[9]])
 ```
 Let's create a recipe to apply some common data processing steps to prepare for SDM fitting.
 
 ```{r steps}
 sdm_recipe <- recipe(dat) %>%
-  step_sample_pseudo_absences(size = 1000)
+  step_sample_pseudo_absences(size = 1000) 
 
 test <- prep(sdm_recipe)
 

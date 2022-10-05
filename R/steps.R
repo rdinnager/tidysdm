@@ -1,7 +1,22 @@
+#' Title
+#'
+#' @param recipe
+#' @param bg_geometry
+#' @param role
+#' @param trained
+#' @param size
+#' @param options
+#' @param skip
+#' @param id
+#'
+#' @return
+#' @export
+#'
+#' @examples
 step_sample_pseudo_absences <- function(
   recipe,
   bg_geometry = NULL,
-  role = "predictor",
+  role = NA,
   trained = FALSE,
   size,
   options = list(type = "random", exact = FALSE),
@@ -9,7 +24,7 @@ step_sample_pseudo_absences <- function(
   id = rand_id("sample_pseudo_absences")
   ) {
 
-  add_step(
+  recipe <- add_step(
     recipe,
     step_sample_pseudo_absences_new(
       bg_geometry = rlang::enquos(bg_geometry),
@@ -21,6 +36,8 @@ step_sample_pseudo_absences <- function(
       id = id
     )
   )
+
+  recipe
 }
 
 step_sample_pseudo_absences_new <-
@@ -78,7 +95,9 @@ bake.step_sample_pseudo_absences <- function(object, new_data, ...) {
   new_col <- do.call(c, new_col)
 
   new_data <- new_data %>%
-    mutate(abs_pnts = new_col)
+    mutate(absent = new_col)
+
+  new_data <- expand_pres_abs(new_data)
 
   new_data
 
@@ -87,4 +106,87 @@ bake.step_sample_pseudo_absences <- function(object, new_data, ...) {
 sample_geom <- function(x, size, args) {
   res <- rlang::exec(sf::st_sample, x = x, size = size, !!!args)
   res
+}
+
+
+step_expand_pres_abs <- function(
+  recipe,
+  role = NA,
+  trained = FALSE,
+  skip = FALSE,
+  id = rand_id("expand_pres_abs")
+  ) {
+
+  add_step(
+    recipe,
+    step_expand_pres_abs_new(
+      trained = trained,
+      role = role,
+      skip = skip,
+      id = id
+    )
+  )
+}
+
+step_expand_pres_abs_new <-
+  function(role, trained, skip, id) {
+    step(
+      subclass = "expand_pres_abs",
+      role = role,
+      trained = trained,
+      skip = skip,
+      id = id
+    )
+  }
+
+#' @export
+prep.step_expand_pres_abs <- function(x, training, info = NULL, ...) {
+
+  ## Use the constructor function to return the updated object.
+
+  step_expand_pres_abs_new(
+    trained = TRUE,
+    role = x$role,
+    skip = x$skip,
+    id = x$id
+  )
+}
+
+#' @export
+bake.step_expand_pres_abs <- function(object, new_data, ...) {
+
+  check_new_data("pres_pnts", object, new_data)
+
+  expand_pres_abs(new_data)
+
+}
+
+expand_pres_abs <- function(new_data) {
+
+  pres <- sf::st_sf(new_data %>%
+                      dplyr::select(id, .data$present) %>%
+                      dplyr::filter(!sf::st_is_empty(.data$present))) %>%
+    sf::st_cast("POINT", warn = FALSE) %>%
+    rename(geom = .data$present) %>%
+    dplyr::mutate(present = 1)
+
+  if("absent" %in% colnames(new_data)) {
+
+  abs <- sf::st_sf(new_data %>%
+                      dplyr::select(id, .data$absent) %>%
+                     dplyr::filter(!sf::st_is_empty(.data$absent))) %>%
+    sf::st_cast("POINT", warn = FALSE) %>%
+    rename(geom = .data$absent) %>%
+    dplyr::mutate(present = 0)
+
+  } else {
+
+    abs <- dplyr::tibble()
+
+  }
+
+  dplyr::bind_rows(pres,
+                   abs) %>%
+    mutate(present = as.integer(.data$present))
+
 }

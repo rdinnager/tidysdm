@@ -9,7 +9,8 @@
 #' a raster mask (in `stars` or `raster` format)
 #' @param n Number of grid cells to divide the background
 #' area into. These grid cells will be used for spatial
-#' resampling (e.g. with `spatialsample` package)
+#' resampling (e.g. with `spatialsample` package) or
+#' thinning (using `step_thin()`)
 #' @param ...
 #'
 #' @return A `sdm_data` object inheriting from a `tibble`
@@ -41,16 +42,24 @@ sdm_data <- function(presence_pnts, bg, n = 500, ...) {
     sf::st_make_valid()
 
   if(sf::st_crs(bg_grid) != sf::st_crs(presence_pnts)) {
-    sf::st_crs(bg_grid) <- sf::st_crs(presence_pnts)
+    rlang::warn("bg and presence_pnts projections (crs) do not match! Attempting to transform bg to presence_pnts' crs")
+    bg_grid <- sf::st_transform(bg_grid, sf::st_crs(presence_pnts))
   }
 
   pp <- presence_pnts %>%
     sf::st_join(bg_grid) %>%
     dplyr::group_by(.data$id) %>%
-    dplyr::summarise(pres_pnts = sf::st_combine(.data$geometry))
+    dplyr::summarise(present = sf::st_combine(.data$geometry))
 
   sdm_dat <- bg_grid %>%
     dplyr::left_join(as_tibble(pp), by = "id")
+
+  g <- attr(sdm_dat, "sf_column")
+
+  colnames(sdm_dat)[colnames(sdm_dat) == g] <- "geom"
+  sf::st_geometry(sdm_dat) <- "geom"
+
+  class(sdm_dat) <- c("sdm_data", class(sdm_dat))
 
   sdm_dat
 
