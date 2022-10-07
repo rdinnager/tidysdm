@@ -7,3 +7,10 @@ bg_convert <- function(bg) {
                         merge = TRUE)
   bg_sf
 }
+
+rename_geom <- function(x, new_geom_name) {
+  g <- attr(x, "sf_column")
+  colnames(x)[colnames(x) == g] <- new_geom_name
+  sf::st_geometry(x) <- new_geom_name
+  x
+}

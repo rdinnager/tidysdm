@@ -36,18 +36,21 @@ We start by generating a {tidymodels} compatable `sf` object for the species we 
 ```{r bg_convert}
 dat <- sdm_data(monticola$presence.points,
                 bg = monticola$range,
+                n = 5000,
                 coords = c("Longitude",
                            "Latitude"),
                 crs = 4326)
 
 dat
 
+plot(dat, pch = 19)
+
 ```
 
 ```{r spatial_block_cv}
 cv_folds <- spatial_block_cv(dat, method = "snake",
                              n = c(6, 4),
-                             buffer = 0.5)
+                             buffer = 50000)
 cv_folds
 autoplot(cv_folds)
 
@@ -58,10 +61,12 @@ Let's create a recipe to apply some common data processing steps to prepare for 
 
 ```{r steps}
 sdm_recipe <- recipe(dat) %>%
-  step_sample_pseudo_absences(size = 1000) 
+  step_thin_pseudo_absences(abs2pres_ratio = 10) %>%
+  step_add_env_vars(env = euro.worldclim)
 
-test <- prep(sdm_recipe)
+test <- prep(sdm_recipe) %>%
+  bake(dat)
 
-test2 <- bake(test, dat)
+test
 
 ```

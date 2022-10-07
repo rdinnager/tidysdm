@@ -6,20 +6,21 @@
 into an \code{sdm_data} object suitable for a
 \code{tidysdm} workflow.}
 \usage{
-sdm_data(presence_pnts, bg, n = 500, ...)
+sdm_data(pres, bg, n = 500, abs = NULL, sample_options = list(), ...)
 }
 \arguments{
-\item{presence_pnts}{Points representing species
+\item{pres}{Points representing species
 occurrences. Should be an \code{sf} object with \code{crs}
 information}
 
 \item{bg}{A background area as an \code{sf} polygon or
 a raster mask (in \code{stars} or \code{raster} format)}
 
-\item{n}{Number of grid cells to divide the background
-area into. These grid cells will be used for spatial
-resampling (e.g. with \code{spatialsample} package) or
-thinning (using \code{step_thin()})}
+\item{n}{Integer specifying the number of background or pseudo-absence
+points to sample from the background as specified by \code{bg}.}
+
+\item{abs}{Optionally an \code{sf} object with true absence data in the form of
+points.}
 
 \item{...}{}
 }
