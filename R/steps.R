@@ -80,7 +80,7 @@ prep.step_sample_pseudo_absences <- function(x, training, info = NULL, ...) {
 
 bake.step_sample_pseudo_absences <- function(object, new_data, ...) {
 
-  check_new_data(object$bg_geometry, object, new_data)
+  #check_new_data(object$bg_geometry, object, new_data)
 
   geom <- new_data[ , object$bg_geometry, drop = TRUE]
   num_poly <- length(geom)
@@ -151,7 +151,7 @@ prep.step_expand_pres_abs <- function(x, training, info = NULL, ...) {
 
 bake.step_expand_pres_abs <- function(object, new_data, ...) {
 
-  check_new_data("pres_pnts", object, new_data)
+  #check_new_data("pres_pnts", object, new_data)
 
   expand_pres_abs(new_data)
 
@@ -259,9 +259,9 @@ prep.step_thin_pseudo_absences <- function(x, training, info = NULL, ...) {
 #' @export
 bake.step_thin_pseudo_absences <- function(object, new_data, ...) {
 
-  check_new_data(c(object$pres, object$pnts), object, new_data)
+  #check_new_data(c(object$pres, object$pnts), object, new_data)
 
-  presents <- new_data[ , object$pres, drop = TRUE] == 1
+  presents <- new_data[ , object$pres, drop = TRUE] == "present"
 
   num_pres <- sum(presents)
   num_abs <- round(object$abs2pres_ratio * num_pres, 0)
@@ -284,7 +284,7 @@ print.step_thin_pseudo_absences <-
                    x$abs2pres_ratio,
                    "presence points\n")
     cat(title)
-    if (trained) {
+    if (x$trained) {
       cat(" [trained]\n")
     }
     invisible(x)
@@ -298,7 +298,7 @@ step_add_env_vars <- function(
   recipe,
   pnts = NULL,
   env,
-  role = NA,
+  role = "predictor",
   trained = FALSE,
   skip = FALSE,
   id = rand_id("add_env_vars")
@@ -354,24 +354,28 @@ prep.step_add_env_vars <- function(x, training, info = NULL, ...) {
 #' @export
 bake.step_add_env_vars <- function(object, new_data, ...) {
 
-  check_new_data(object$pnts, object, new_data)
+  #check_new_data(object$pnts, object, new_data)
 
-  env <- check_env(object$env)
+  # new_data <- sf::st_sf(new_data)
+  #
+  # env <- check_env(object$env)
+  #
+  # env_vars <- stars::st_extract(env, sf::st_coordinates(new_data))
+  # colnames(env_vars) <- stars::st_get_dimension_values(env, "band")
+  # new_data <- new_data %>%
+  #   dplyr::bind_cols(env_vars) %>%
+  #   sf::st_sf(sf_column_name = object$pnts)
 
-  env_vars <- stars::st_extract(env, sf::st_coordinates(new_data))
-  colnames(env_vars) <- stars::st_get_dimension_values(env, "band")
-  new_data <- new_data %>%
-    dplyr::bind_cols(env_vars) %>%
-    sf::st_sf(sf_column_name = object$pnts)
+  new_data <- add_env_vars(new_data, object$env)
+
+  dplyr::as_tibble(new_data)
 
 }
 
 #' @export
 print.step_add_env_vars <-
   function(x, width = max(20, options()$width - 39), ...) {
-    title <- paste("Thinning pseudo-absences to",
-                   x$abs2pres_ratio,
-                   "per presence point\n")
+    title <- paste("Add environmental variables. ")
     cat(title)
     if (x$trained) {
       cat(" [trained]\n")
@@ -385,3 +389,232 @@ check_env <- function(env) {
   }
   env
 }
+
+
+################ spatial lag ##################################
+
+#' @export
+step_initialize_spatial_lags <- function(
+  recipe,
+  col_names = "present",
+  role = "predictor",
+  trained = FALSE,
+  k = 8,
+  skip = FALSE,
+  id = rand_id("add_env_vars")
+  ) {
+
+  #terms <- ellipse_check(...)
+
+  add_step(
+    recipe,
+    step_initialize_spatial_lags_new(
+      trained = trained,
+      role = role,
+      k = k,
+      col_names = col_names,
+      skip = skip,
+      id = id
+    )
+  )
+}
+
+step_initialize_spatial_lags_new <-
+  function(role, trained, k, col_names, skip, id) {
+    step(
+      subclass = "initialize_spatial_lags",
+      role = role,
+      trained = trained,
+      k = k,
+      col_names = col_names,
+      skip = skip,
+      id = id
+    )
+  }
+
+#' @export
+prep.step_initialize_spatial_lags <- function(x, training, info = NULL, ...) {
+
+  #col_names <- recipes_eval_select(x$terms, training, info)
+
+  ## Use the constructor function to return the updated object.
+
+  step_initialize_spatial_lags_new(
+    trained = TRUE,
+    role = x$role,
+    k = x$k,
+    col_names = x$col_names,
+    skip = x$skip,
+    id = x$id
+  )
+}
+
+#' @export
+bake.step_initialize_spatial_lags <- function(object, new_data, ...) {
+
+  #check_new_data(object$col_names, object, new_data)
+
+  new_names <- paste0(object$col_names,
+                          "_spat_",
+                          object$k)
+
+  temp <- as.data.frame(matrix(0, nrow = nrow(new_data), ncol = length(object$col_names)))
+
+  colnames(temp) <- new_names
+
+  dplyr::bind_cols(new_data, temp)
+
+}
+
+#' @export
+print.step_initialize_spatial_lags <-
+  function(x, width = max(20, options()$width - 39), ...) {
+    cat("Initialize spatial lag variables on ", sep = "")
+    printer(
+      # Names before prep (could be selectors)
+      #untr_obj = rlang::ensyms(x$col_names),
+      # Names after prep:
+      tr_obj = x$col_names,
+      # Has it been prepped?
+      trained = x$trained,
+      # An estimate of how many characters to print on a line:
+      width = width
+    )
+    invisible(x)
+  }
+
+
+
+#' @export
+step_fill_spatial_lags <- function(
+  recipe,
+  ...,
+  pnts = NULL,
+  neighbours = NULL,
+  role = "predictor",
+  trained = FALSE,
+  k = 8,
+  maxdist = 500000,
+  parallel = 1,
+  col_names = NULL,
+  skip = TRUE,
+  id = rand_id("add_env_vars")
+  ) {
+
+  terms <- ellipse_check(...)
+
+  add_step(
+    recipe,
+    step_fill_spatial_lags_new(
+      terms = terms,
+      pnts = rlang::enquos(pnts),
+      neighbours = rlang::enquos(neighbours),
+      trained = trained,
+      role = role,
+      k = k,
+      maxdist = maxdist,
+      parallel = parallel,
+      col_names = col_names,
+      skip = skip,
+      id = id
+    )
+  )
+}
+
+step_fill_spatial_lags_new <-
+  function(terms, pnts, neighbours, role, trained, k, maxdist, parallel, col_names, skip, id) {
+    step(
+      subclass = "fill_spatial_lags",
+      terms = terms,
+      pnts = pnts,
+      neighbours = neighbours,
+      role = role,
+      trained = trained,
+      k = k,
+      maxdist = maxdist,
+      parallel = parallel,
+      col_names = col_names,
+      skip = skip,
+      id = id
+    )
+  }
+
+#' @export
+prep.step_fill_spatial_lags <- function(x, training, info = NULL, ...) {
+
+  pnts <- recipes_eval_select(x$pnts, training, info)
+  neighbours <- recipes_eval_select(x$neighbours, training, info)
+  col_names <- recipes_eval_select(x$terms, training, info)
+
+  if(length(pnts) == 0) {
+    pnts <- attr(training, "sf_column")
+  }
+
+  if(length(neighbours) == 0) {
+    dat <- training[ , pnts]
+    nn <- get_spatial_neighbours(dat, k = x$k, maxdist = x$maxdist, parallel = x$parallel)
+  } else {
+    nn <- neighbours
+  }
+
+  step_fill_spatial_lags_new(
+    terms = x$terms,
+    pnts = pnts,
+    neighbours = nn,
+    trained = TRUE,
+    role = x$role,
+    k = x$k,
+    maxdist = x$maxdist,
+    parallel = x$parallel,
+    col_names = col_names,
+    skip = x$skip,
+    id = x$id
+  )
+}
+
+#' @export
+bake.step_fill_spatial_lags <- function(object, new_data, ...) {
+
+  check_new_data(object$col_names, object, new_data)
+  #check_new_data(object$pnts, object, new_data)
+  #check_new_data(object$neighbours, object, new_data)
+
+  new_data <- dplyr::as_tibble(new_data)
+
+  temp <- new_data[, object$col_names] %>%
+    dplyr::mutate(neighbours = object$neighbours) %>%
+    dplyr::mutate(dplyr::across(.cols = dplyr::all_of(object$col_names),
+                                .fns = function(x) purrr::map_dbl(neighbours,
+                                                                  function(y) mean(as.numeric(x[y]) - 1,
+                                                                         na.rm = TRUE)))) %>%
+    dplyr::mutate(dplyr::across(.cols = dplyr::all_of(object$col_names),
+                                .fns = ~ (.x - mean(.x, na.rm = TRUE)) / sd(.x, na.rm = TRUE))) %>%
+    dplyr::select(-neighbours)
+
+  new_names <- paste0(object$col_names,
+                      "_spat_",
+                      object$k)
+  colnames(temp) <- new_names
+
+  new_data[ , new_names] <- NULL
+
+  dplyr::bind_cols(new_data, temp)
+
+}
+
+#' @export
+print.step_fill_spatial_lags <-
+  function(x, width = max(20, options()$width - 39), ...) {
+    cat("Fill spatial lag variables on ", sep = "")
+    printer(
+      # Names before prep (could be selectors)
+      untr_obj = x$terms,
+      # Names after prep:
+      tr_obj = x$col_names,
+      # Has it been prepped?
+      trained = x$trained,
+      # An estimate of how many characters to print on a line:
+      width = width
+    )
+    invisible(x)
+  }

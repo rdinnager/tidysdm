@@ -16,13 +16,15 @@ knitr::opts_chunk$set(
 
 ```{r setup}
 library(tidysdm)
+set.seed(112233)
 ```
 
 `tidysdm` is an offshoot of the `ENMTools` package, and will eventually take over that package's modelling functions. `tidysdm` is a package to make it easy to fit Species Distribution Models in a `tidymodels` framework.
-We will use data from the `ENMTools` package to demonstrate how `tidysdm` works. `tidysdm` is
+We will use data from the `ENMTools` package to demonstrate how `tidysdm` works. 
 
 ```{r load_data}
 library(ENMTools)
+library(tidyverse)
 library(tidymodels)
 library(spatialsample)
 data("iberolacerta.clade")
@@ -31,7 +33,7 @@ monticola <- iberolacerta.clade$species$monticola
 
 ```
 
-We start by generating a {tidymodels} compatable `sf` object for the species we want to
+We start by generating a {tidymodels} compatable `sf` object for the species we want to model.
 
 ```{r bg_convert}
 dat <- sdm_data(monticola$presence.points,
@@ -43,30 +45,192 @@ dat <- sdm_data(monticola$presence.points,
 
 dat
 
-plot(dat, pch = 19)
+plot(dat %>% 
+       dplyr::select(present) %>% 
+       arrange(present), 
+     pch = 19)
 
 ```
+
+Now we can use the `{spatialsample}` package to create spatial cross validation folds! We will first create a regular cross validation fold object for comparison. Note that this can take awhile because a spatial distance is calculated between all points! We are working on a faster method for pseudo-absence data.
 
 ```{r spatial_block_cv}
-cv_folds <- spatial_block_cv(dat, method = "snake",
-                             n = c(6, 4),
-                             buffer = 50000)
-cv_folds
-autoplot(cv_folds)
+## regular CV
+cv_folds <- vfold_cv(dat, 9)
 
-autoplot(cv_folds$splits[[1]])
-autoplot(cv_folds$splits[[9]])
+## spatial CV
+cv_folds_spat <- spatial_block_cv(dat, method = "snake",
+                             n = c(6, 4),
+                             v = 9,
+                             buffer = 50000)
+cv_folds_spat
+
+## look at the spatial folds
+autoplot(cv_folds_spat)
+
+autoplot(cv_folds_spat$splits[[1]])
+autoplot(cv_folds_spat$splits[[8]])
 ```
-Let's create a recipe to apply some common data processing steps to prepare for SDM fitting.
+Let's create a recipe to apply some common data processing steps to prepare for SDM fitting. We start with `step_add_env_vars()`, which is a `{tidymodels}` function. The rest are standard steps from the `{recipes}` package. `step_impute_median()` imputes missing values (since we will be doing a random forest model which cannot handle missing values). `step_YeoJohnson()` does a Yeo-Johnson transformation on the predictors, which makes them more symmetric and '*Gaussian*-like'. It also saves the parameters used in the transformation which will be automatically applied to any test data used for prediction later. Finally `step_normalize()` transforms predictors to have a mean of zero and a standard deviation of 1, so that they are all on the same scale. It also saves the means and sds to be applied to test data. To see the result of the step we run `prep()` and `bake(new_data = NULL)`. 
 
 ```{r steps}
 sdm_recipe <- recipe(dat) %>%
-  step_thin_pseudo_absences(abs2pres_ratio = 10) %>%
-  step_add_env_vars(env = euro.worldclim)
+  step_add_env_vars(env = euro.worldclim) %>%
+  step_impute_median(all_predictors()) %>%
+  step_YeoJohnson(all_predictors()) %>%
+  step_normalize(all_predictors())
 
 test <- prep(sdm_recipe) %>%
-  bake(dat)
+  bake(NULL)
 
 test
 
+```
+Now we can setup a random forest model with `{parsnip}` and combine it with our recipe using a workflow from the `{workflows}` package..
+
+```{r workflow}
+mod <- rand_forest() %>%
+  set_engine("ranger", importance = "impurity") %>%
+  set_mode("classification")
+
+wf <- workflow() %>%
+  add_recipe(sdm_recipe) %>%
+  add_model(mod,
+            formula = present ~ .)
+
+wf
+```
+
+Now we fit the model! We will start with the regular cross validation folds, and use `fit_resamples()` to generate metrics based on the fits to each of the validation sets in our folds. Then `collect_metrics()` will calculate the means across folds for us.
+
+```{r fit_regular}
+fit_1 <- wf %>%
+  fit_resamples(cv_folds, 
+                control = control_resamples(extract = extract_fit_engine))
+
+fit_1 %>%
+  collect_metrics()
+```
+
+Okay, so our ROC AUC value is pretty good at around 0.82. Now we do the same for the spatial cross validation folds. 
+
+```{r fit_spatial}
+fit_2 <- wf %>%
+  fit_resamples(cv_folds_spat,
+                control = control_resamples(extract = extract_fit_engine))
+
+fit_2 %>%
+  collect_metrics()
+
+```
+
+Using spatially independent cross validation folds has shown us our model does much more poorly if we ask it to generalise to spatial areas not in the training set. Now ROC AUC is only ~ 0.58 -- considerably worse. Looking at the individual folds, there is substantial variation in the quality of models. 
+
+```{r metrics_folds}
+fit_2$.metrics
+
+```
+
+The first fold the model looks to have done a reasonable job. Which one was that?
+
+```{r plot_last_fold}
+autoplot(cv_folds_spat$splits[[1]])
+
+```
+
+Let's have a look at the importance values determined by the random forest for our variables.
+
+```{r importance}
+library(vip)
+library(patchwork)
+
+fit_1 %>%
+  unnest(.extracts) %>%
+  pull(.extracts) %>%
+  map(vip) %>%
+  wrap_plots(ncol = 3, nrow = 3)
+
+```
+The ordering is reasonably consistent between different folds. Now, the spatial folds:
+
+```{r importance2}
+fit_2 %>%
+  unnest(.extracts) %>%
+  pull(.extracts) %>%
+  map(vip) %>%
+  wrap_plots(ncol = 3, nrow = 3)
+
+```
+There seems to be quite a bit more variation in what variables are important between different spatial folds. Which is interesting.
+
+We can try and improve the performance of the model on spatially independent data by using the spatial cross validation folds to tune the hyperparameters of the model. We can use the `{tune}` package for this. Using `tune_bayes()` we can use Bayesian optimization to find an optimal set. What hyperparameters should we tune. For random forest we only have three, `mtry`, `trees`, and `min_n`. Let's try tuning all three. First we make a new model object where we designate these parameters for tuning, then wrap it into a new workflow.
+
+```{r tune}
+mod_tune <- rand_forest(mtry = tune(),
+                        trees = tune(),
+                        min_n = tune()) %>%
+  set_engine("ranger", importance = "impurity") %>%
+  set_mode("classification")
+
+wf_tune <- workflow() %>%
+  add_recipe(sdm_recipe) %>%
+  add_model(mod_tune,
+            formula = present ~ .)
+
+wf_tune
+
+```
+Tuning is now as simple as calling `tune_bayes()`. First we set up an initial set of tuning models using a tuning grid (regularly spaced values of the hyper-parameters). By the way, this will take awhile. If you want to do this on your computer I would recommend setting up a parallel backend for tuning (see <https://tune.tidymodels.org/articles/extras/optimizations.html>). 
+
+```{r tune_grid}
+tune_init <- wf_tune %>%
+  tune_grid(cv_folds_spat,
+            grid = 27,
+            control = control_grid(verbose = interactive()))
+
+```
+Now this serves as initial values for `tune_bayes()`. 
+
+```{r tune_bayes}
+final_params <- extract_parameter_set_dials(mod_tune) %>%
+  finalize(dat)
+
+tuned <- wf_tune %>%
+  tune_bayes(cv_folds_spat,
+             initial = tune_init,
+             iter = 100,
+             param_info = final_params,
+             control = control_bayes(verbose = interactive(),
+                                     no_improve = 100L))
+```
+
+```{r show_best}
+tuned %>%
+  show_best()
+```
+
+After all that we haven't much improved the ability of our model to predict spatially separated testing data sets! This is not that surprising since random forest generally doesn't need much tuning. And ultimately, the problem is not poor hyper-parameters but overfitting to spatial patterns found in the data. This cannot be prevented except by finding some way to help the model 'account' for spatial autocorrelation in the data. There are some approaches to doing this, which might help, but can only go so far. The problem of space is impossible to make go away completely, at least using statistical methods.
+
+Note that the best solutions had a very low `mtry`. This means the random forest is only using 1 to 3 variables at a time to make predictions. This implies all variable contain mostly the same amount of information and don't interact much, suggesting that these climate predictors have little to do with the species distribution, each is mainly being used for their spatial information. The best bet here, as in most cases is to find better predictors that are more definitely related to the species' known ecology!
+
+Lastly, `{tidysdm}` makes it easy to generate visualizable predictions on the original landscape using the `create_prediction_grid()` function, which creates a grid of x and y values, optionally with a polygon attached to help with plotting. Feeding this to the `augment` function will automatically make predictions based on the model and the bind those prediction back to the prediction grid data, ready for plotting. We will make hexagons which look much cooler than squares (just use `square = FALSE`).
+
+```{r preds}
+pred_grid <- create_prediction_grid(bg = monticola$range, n = 2500, square = FALSE, include_polygons = TRUE)
+plot(pred_grid$polygon)
+```
+ Now to make the predictions we first do a final fit of our random forest model on the full data set, and using the best hyper-parameters from our spatial cross validation.
+ 
+
+```{r final_fit}
+final_fit <- wf_tune %>%
+  finalize_workflow(select_best(tuned)) %>%
+  fit(dat)
+final_fit
+```
+
+```{r augment}
+pred_grid_preds <- final_fit %>%
+  augment(pred_grid %>% dplyr::as_tibble())
+ 
 ```

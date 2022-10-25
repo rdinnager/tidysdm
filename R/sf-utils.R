@@ -1,4 +1,10 @@
 bg_convert <- function(bg) {
+  if(inherits(bg, "sf")) {
+    return(bg)
+  }
+  if(inherits(bg, "sfc")) {
+    return(bg)
+  }
   if(!inherits(bg, "stars")) {
     bg <- stars::st_as_stars(bg)
   }

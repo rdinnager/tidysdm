@@ -18,9 +18,6 @@
 #'
 #' @examples
 sdm_data <- function(pres, bg, n = 500, abs = NULL, sample_options = list(), ...) {
-  if(!inherits(pres, "sf")) {
-    pres <- sf::st_as_sf(pres, ...)
-  }
 
   bg <- bg_convert(bg)
 
@@ -42,6 +39,14 @@ sdm_data <- function(pres, bg, n = 500, abs = NULL, sample_options = list(), ...
   #   dplyr::select(id) %>%
   #   sf::st_make_valid()
 
+  if(is.null(pres)) {
+    pres <- c(sf::st_sfc(sf::st_point(), crs = sf::st_crs(bg)))
+  }
+
+  if(!inherits(pres, "sf")) {
+    pres <- sf::st_as_sf(pres, ...)
+  }
+
   if(sf::st_crs(bg) != sf::st_crs(pres)) {
     rlang::warn("bg and presence_pnts projections (crs) do not match! Attempting to transform bg to presence_pnts' crs")
     bg <- sf::st_transform(bg, sf::st_crs(pres))
@@ -49,7 +54,7 @@ sdm_data <- function(pres, bg, n = 500, abs = NULL, sample_options = list(), ...
 
   abs2 <- rlang::exec(sf::st_sample, x = bg, size = n, !!!sample_options) %>%
     sf::st_as_sf() %>%
-    dplyr::mutate(present = 0, pnt_origin = "pseudo")
+    dplyr::mutate(present = "absent", pnt_origin = "pseudo")
 
   abs2 <- rename_geom(abs2, "pnts")
 
@@ -58,19 +63,20 @@ sdm_data <- function(pres, bg, n = 500, abs = NULL, sample_options = list(), ...
   } else {
     abs <- abs %>%
       rename_geom("pnts") %>%
-      dplyr::mutate(present = 1, pnt_origin = "data") %>%
+      dplyr::mutate(present = "present", pnt_origin = "data") %>%
       bind_rows(abs2)
   }
 
   sdm_dat <- pres %>%
     rename_geom("pnts") %>%
-    dplyr::mutate(present = 1, pnt_origin = "data") %>%
+    dplyr::mutate(present = "present", pnt_origin = "data") %>%
     dplyr::bind_rows(abs)
 
   class(sdm_dat) <- c("sdm_data", class(sdm_dat))
 
   sdm_dat %>%
     dplyr::select(.data$pnts, .data$present, .data$pnt_origin) %>%
-    dplyr::mutate(present = as.integer(.data$present))
+    dplyr::mutate(present = as.factor(.data$present)) %>%
+    filter(!sf::st_is_empty(pnts))
 
 }
