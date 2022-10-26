@@ -1,25 +1,42 @@
 ---
-title: "Getting Started with {tidysdm}"
-output: rmarkdown::html_vignette
-vignette: >
-  %\VignetteIndexEntry{Getting Started with {tidysdm}}
-  %\VignetteEngine{knitr::rmarkdown}
-  %\VignetteEncoding{UTF-8}
+output: github_document
 ---
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
 
 ```{r, include = FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
-  comment = "#>"
+  comment = "#>",
+  fig.path = "man/figures/README-",
+  out.width = "100%"
 )
 ```
+
+# tidysdm
+
+<!-- badges: start -->
+[![R-CMD-check](https://github.com/rdinnager/tidysdm/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/rdinnager/tidysdm/actions/workflows/R-CMD-check.yaml)
+<!-- badges: end -->
+
+`tidysdm` is a package to make it easy to fit Species Distribution Models in a `tidymodels` framework.
+
+## Installation
+
+You can install the development version of tidysdm from [GitHub](https://github.com/) with:
+
+``` r
+# install.packages("devtools")
+devtools::install_github("rdinnager/tidysdm")
+```
+
+## Example
 
 ```{r setup}
 library(tidysdm)
 set.seed(112233)
 ```
 
-`tidysdm` is an offshoot of the `ENMTools` package, and will eventually take over that package's modelling functions. `tidysdm` is a package to make it easy to fit Species Distribution Models in a `tidymodels` framework.
 We will use data from the `ENMTools` package to demonstrate how `tidysdm` works. 
 
 ```{r load_data}
@@ -187,7 +204,7 @@ wf_tune
 
 Tuning is now as simple as calling `tune_bayes()`. First we set up an initial set of tuning models using a tuning grid (regularly spaced values of the hyper-parameters). By the way, this will take awhile. If you want to do this on your computer I would recommend setting up a parallel backend for tuning (see <https://tune.tidymodels.org/articles/extras/optimizations.html>). 
 
-```{r tune_grid}
+```{r tune_grid, eval=FALSE}
 tune_init <- wf_tune %>%
   tune_grid(cv_folds_spat,
             grid = 27,
@@ -197,20 +214,20 @@ tune_init <- wf_tune %>%
 
 Now this serves as initial values for `tune_bayes()`. 
 
-```{r tune_bayes}
+```{r tune_bayes, eval=FALSE}
 final_params <- extract_parameter_set_dials(mod_tune) %>%
   finalize(dat)
 
 tuned <- wf_tune %>%
   tune_bayes(cv_folds_spat,
              initial = tune_init,
-             iter = 100,
+             iter = 50,
              param_info = final_params,
              control = control_bayes(verbose = interactive(),
                                      no_improve = 50L))
 ```
 
-```{r show_best}
+```{r show_best, eval=FALSE}
 tuned %>%
   show_best()
 ```
@@ -221,15 +238,14 @@ Note that the best solutions had a very low `mtry`. This means the random forest
 
 Lastly, `{tidysdm}` makes it easy to generate visualizable predictions on the original landscape using the `create_prediction_grid()` function, which creates a grid of x and y values, optionally with a polygon attached to help with plotting. Feeding this to the `augment` function will automatically make predictions based on the model and the bind those prediction back to the prediction grid data, ready for plotting. We will make hexagons which look much cooler than squares (just use `square = FALSE`).
 
-```{r preds}
+```{r preds, eval=FALSE}
 pred_grid <- create_prediction_grid(bg = monticola$range, n = 2500, square = FALSE, include_polygons = TRUE)
 plot(pred_grid$polygon)
 ```
-
-Now to make the predictions we first do a final fit of our random forest model on the full data set, and using the best hyper-parameters from our spatial cross validation.
+ Now to make the predictions we first do a final fit of our random forest model on the full data set, and using the best hyper-parameters from our spatial cross validation.
  
 
-```{r final_fit}
+```{r final_fit, eval=FALSE}
 final_fit <- wf_tune %>%
   finalize_workflow(select_best(tuned)) %>%
   fit(dat)

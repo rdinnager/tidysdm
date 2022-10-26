@@ -31,3 +31,4 @@ Suggests:
     rmarkdown,
     roxygen2
 VignetteBuilder: knitr
+URL: https://rdinnager.github.io/tidysdm/
