@@ -52,7 +52,7 @@ plot(dat %>%
 
 ```
 
-Now we can use the `{spatialsample}` package to create spatial cross validation folds! We will first create a regular cross validation fold object for comparison. Note that this can take awhile because a spatial distance is calculated between all points! We are working on a faster method for pseudo-absence data.
+Now we can use the `{spatialsample}` package to create spatial cross validation folds! We will first create a regular cross validation fold object for comparison. Note that this can take awhile because a spatial distance is calculated between all points! 
 
 ```{r spatial_block_cv}
 ## regular CV
@@ -65,10 +65,26 @@ cv_folds_spat <- spatial_block_cv(dat, method = "snake",
                              buffer = 50000)
 cv_folds_spat
 
+
 ## look at the spatial folds
 autoplot(cv_folds_spat)
 
-autoplot(cv_folds_spat$splits[[1]])
+autoplot(cv_folds_spat$splits[[2]])
+autoplot(cv_folds_spat$splits[[8]])
+
+```
+
+A faster spatial cross validation specifically designed for presence-only data is included in `{tidysdm}`. It is faster because it first divides the space up into a grid, and then uses the grid cells in the cross validation instead of individual points. All point in each grid cell get 'dragged along' with the cell as it gets shuffled into the analysis or assessment set. This way the function does not have to calculate pairwise distance for all points, just for the grid cells. It also reduces the chances of getting analysis sets with only presences or only absences. Let's try it now.
+
+```{r spatial_block_cv2}
+## presence only (po) spatial CV
+cv_folds_spat <- po_spatial_buffer_vfold_cv(dat, presence = "present", n = c(24, 16),
+                                             v = 9)
+
+## look at the spatial folds
+autoplot(cv_folds_spat)
+
+autoplot(cv_folds_spat$splits[[2]])
 autoplot(cv_folds_spat$splits[[8]])
 ```
 
@@ -118,7 +134,7 @@ Okay, so our ROC AUC value is pretty good at around 0.82. Now we do the same for
 
 ```{r fit_spatial}
 fit_2 <- wf %>%
-  fit_resamples(cv_folds_spat,
+  fit_resamples(cv_folds_spat2,
                 control = control_resamples(extract = extract_fit_engine))
 
 fit_2 %>%

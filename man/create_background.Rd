@@ -8,7 +8,7 @@ create_background(
   x,
   method = c("convex_hull", "point_buffer", "ecoregion", "concave_hull", "grid_fill",
     "user_fill"),
-  buffer = 1,
+  buffer = 0,
   max_bg = NULL,
   grid_options = NULL,
   concave_options = NULL

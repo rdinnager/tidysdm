@@ -17,6 +17,7 @@ Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.2.1
 Depends: 
     parsnip,
+    R (>= 2.10),
     recipes
 Imports: 
     dplyr,
@@ -32,3 +33,4 @@ Suggests:
     roxygen2
 VignetteBuilder: knitr
 URL: https://rdinnager.github.io/tidysdm/
+LazyData: true
