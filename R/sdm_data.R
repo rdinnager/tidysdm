@@ -53,7 +53,7 @@ sdm_data <- function(pres, bg, n = 500, abs = NULL, sample_options = list(), ...
   }
 
   abs2 <- rlang::exec(sf::st_sample, x = bg, size = n, !!!sample_options) %>%
-    sf::st_as_sf() %>%
+    sf::st_as_sf(crs = sf::st_crs(bg)) %>%
     dplyr::mutate(present = "absent", pnt_origin = "pseudo")
 
   abs2 <- rename_geom(abs2, "pnts")
