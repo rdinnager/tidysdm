@@ -30,7 +30,9 @@ Imports:
 Suggests: 
     knitr,
     rmarkdown,
-    roxygen2
+    roxygen2,
+    ENMTools
 VignetteBuilder: knitr
 URL: https://rdinnager.github.io/tidysdm/
 LazyData: true
+Remotes: danlwarren/ENMTools
