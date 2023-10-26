@@ -134,7 +134,7 @@ Okay, so our ROC AUC value is pretty good at around 0.82. Now we do the same for
 
 ```{r fit_spatial}
 fit_2 <- wf %>%
-  fit_resamples(cv_folds_spat2,
+  fit_resamples(cv_folds_spat,
                 control = control_resamples(extract = extract_fit_engine))
 
 fit_2 %>%
@@ -142,17 +142,17 @@ fit_2 %>%
 
 ```
 
-Using spatially independent cross validation folds has shown us our model does much more poorly if we ask it to generalise to spatial areas not in the training set. Now ROC AUC is only ~ 0.58 -- considerably worse. Looking at the individual folds, there is substantial variation in the quality of models. 
+Using spatially independent cross validation folds has shown us our model does much more poorly if we ask it to generalise to spatial areas not in the training set. Now ROC AUC is only ~ 0.72 -- considerably worse. Looking at the individual folds, there is substantial variation in the quality of models. 
 
 ```{r metrics_folds}
 fit_2$.metrics
 
 ```
 
-The first fold the model looks to have done a reasonable job. Which one was that?
+In the eighth fold the model looks to have done a reasonable job. Which one was that?
 
 ```{r plot_last_fold}
-autoplot(cv_folds_spat$splits[[1]])
+autoplot(cv_folds_spat$splits[[8]])
 
 ```
 
