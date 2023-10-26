@@ -31,7 +31,10 @@ Suggests:
     knitr,
     rmarkdown,
     roxygen2,
-    ENMTools
+    ENMTools,
+    tidyverse,
+    tidymodels,
+    spatialsample
 VignetteBuilder: knitr
 URL: https://rdinnager.github.io/tidysdm/
 LazyData: true
