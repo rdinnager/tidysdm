@@ -36,7 +36,8 @@ Suggests:
     tidymodels,
     spatialsample,
     lwgeom,
-    ranger
+    ranger,
+    vip
 VignetteBuilder: knitr
 URL: https://rdinnager.github.io/tidysdm/
 LazyData: true
