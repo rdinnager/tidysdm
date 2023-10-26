@@ -34,7 +34,8 @@ Suggests:
     ENMTools,
     tidyverse,
     tidymodels,
-    spatialsample
+    spatialsample,
+    lwgeom
 VignetteBuilder: knitr
 URL: https://rdinnager.github.io/tidysdm/
 LazyData: true
