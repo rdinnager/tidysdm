@@ -1,3 +1,4 @@
+#' @import recipes parsnip
 #' @export
 recipe.sdm_data <- function(x, ...) {
   NextMethod("recipe", x,
